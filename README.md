@@ -4,7 +4,7 @@ Inspired by [/Alarty/communauto-search](https://github.com/Alarty/communauto-sea
 
 A CLI which simplifies interaction with Communauto website, currently supported commands are:
 
-####List reservations:
+#### List reservations:
 
 ```bash
 ./communauto-cli.py list-reservations --status=upcoming                                                                         
