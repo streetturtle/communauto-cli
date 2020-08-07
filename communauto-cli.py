@@ -20,12 +20,12 @@ def main():
 @click.option('--start_date', help='Start date of the reservation', type=click.DateTime(formats=["%d/%m/%y %H:%M"]), required=True)
 @click.option('--end_date', help='End date of the reservation', type=click.DateTime(formats=["%d/%m/%y %H:%M"]), required=True)
 @click.option('--lang', help='Preferred language', type=click.Choice(['en', 'fr'], case_sensitive=False), default='en')
-@click.option('--username', help='Membership number / Email address or env variable = ca_user', envvar='ca_user', required=True)
-@click.option('--password', help='Password or env variable = ca_password', envvar='ca_password', prompt=True, hide_input=True)
+@click.option('--username', help='Membership number / Email address or env variable: ca_user', envvar='ca_user', required=True)
+@click.option('--password', help='Password or env variable: ca_password', envvar='ca_password', prompt=True, hide_input=True)
 @click.option('--city', type=click.Choice(['Montreal', 'Sherbrooke', 'Quebec', 'Gatineau', 'Kingston', 'Ottawa', 'SW Ontario'], case_sensitive=False), default='Montreal')
 @click.option('--output', help='Output type', type=click.Choice(['table', 'json'], case_sensitive=False), default='table')
 def search(start_date, end_date, lang, username, password, city, output):
-    """Searches for available communauto cars for the given period"""
+    """Search for available cars"""
     browser = authorize(username, password)
     city_name_to_city_id = {
         'Montreal': '59',
@@ -101,8 +101,8 @@ def search(start_date, end_date, lang, username, password, city, output):
 
 
 @main.command()
-@click.option('--username', help='Membership number / Email address (env variable = ca_user)', envvar='ca_user', required=True)
-@click.option('--password', help='Password (env variable = ca_password)', envvar='ca_password', prompt=True, hide_input=True)
+@click.option('--username', help='Membership number / Email address or env variable: ca_user', envvar='ca_user', required=True)
+@click.option('--password', help='Password or env variable: ca_password', envvar='ca_password', prompt=True, hide_input=True)
 @click.option('--lang', help='Preferred language', type=click.Choice(['en', 'fr'], case_sensitive=False), default='en')
 @click.option('--status', help='Reservation Status', type=click.Choice(['Ongoing', 'Upcoming', 'Past', 'Cancelled', 'All'], case_sensitive=False), default='Upcoming')
 @click.option('--output', help='Output type', type=click.Choice(['table', 'json'], case_sensitive=False), default='table')
@@ -123,7 +123,6 @@ def list_reservations(username, password, lang, status, output):
                        '&ReservationStatus=' + status_name_to_status_id[status] + \
                        '&CurrentLanguageID=' + ("2" if lang == 'en' else "1")
 
-    print(reservations_url)
     browser.open(reservations_url)
 
     reservations = []
