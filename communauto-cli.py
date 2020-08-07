@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 from http import cookiejar
-from xml.etree.ElementTree import parse
 
+import utils
 import click
 import geopy.distance
 import mechanize
@@ -27,19 +27,10 @@ def main():
 def search(start_date, end_date, lang, username, password, city, output):
     """Search for available cars"""
     browser = authorize(username, password)
-    city_name_to_city_id = {
-        'Montreal': '59',
-        'Sherbrooke': '89',
-        'Quebec': '90',
-        'Gatineau': '94',
-        'Kingston': '97',
-        'Ottawa': '93',
-        'SW Ontario': '103'
-    }
 
     book_url = "https://www.reservauto.net/Scripts/client/ReservationDisponibility.asp" \
                "?IgnoreError=False" \
-               "&CityID=" + city_name_to_city_id[city] + \
+               "&CityID=" + utils.CITY_NAME_TO_CITY_ID[city] + \
                "&StationID=C" \
                "&CustomerLocalizationID=" \
                "&OrderBy=2" \
@@ -61,29 +52,25 @@ def search(start_date, end_date, lang, username, password, city, output):
                "&EndMinute=" + str(end_date.minute) + \
                "&CurrentLanguageID=" + ("2" if lang == 'en' else "1")
 
-    str_date_begin = f"{start_date.day}/{start_date.month}/{start_date.year} {start_date.hour}:{start_date.minute}"
-    str_date_end = f"{end_date.day}/{end_date.month}/{end_date.year} {end_date.hour}:{end_date.minute}"
-    id_slot = f"{str_date_begin} - {str_date_end}"
-
     browser.open(book_url)
 
-    soup = BeautifulSoup(browser.response().read().decode("utf-8"), features="lxml")
-    soup = soup.find('table')
-    soup_stations = soup.select("a[href*=InfoStation]")
-    soup_coords = soup.select("a[href*=BillingRulesAcpt]")
-    soup_descs = soup.find_all('td', {'align': "center", "width": "420"})[1:]
-    assert len(soup_stations) == len(soup_coords) == len(soup_descs)
+    bs = BeautifulSoup(browser.response().read().decode("utf-8"), features="lxml")
+    table = bs.find('table')
+    stations = table.select("a[href*=InfoStation]")
+    coordinates = table.select("a[href*=BillingRulesAcpt]")
+    descriptions = table.find_all('td', {'align': "center", "width": "420"})[1:]
+    assert len(stations) == len(coordinates) == len(descriptions)
 
     cars = []
-    if len(soup_stations) > 0:
-        for car_idx in range(0, len(soup_stations)):
-            station_name = soup_stations[car_idx].text.strip()
-            station_id = soup_stations[car_idx].attrs['href'].strip()
+    if len(stations) > 0:
+        for car_idx in range(0, len(stations)):
+            station_name = stations[car_idx].text.strip()
+            station_id = stations[car_idx].attrs['href'].strip()
             station_id = station_id.partition("StationID=")[2].partition("\'")[0]
-            station_stored_info = get_station_from_id(station_id)
-            user_coords = soup_coords[car_idx].attrs['href'].strip()
+            station_stored_info = utils.get_station_by_id(station_id)
+            user_coords = coordinates[car_idx].attrs['href'].strip()
             user_coords = user_coords.partition("false, ")[2].partition(");")[0].split(",")[0:2]
-            car_desc = soup_descs[car_idx].get_text(' ').strip().split(' - ')
+            car_desc = descriptions[car_idx].get_text(' ').strip().split(' - ')
             distance = geopy.distance.distance((user_coords[1], user_coords[0]),
                                                (station_stored_info['Latitude'], station_stored_info['Longitude'])).km
             car = {'station_name': station_name,
@@ -92,12 +79,18 @@ def search(start_date, end_date, lang, username, password, city, output):
                    'car_features': " ".join(car_desc[2:])}
             cars.append(car)
 
+    str_date_begin = f"{start_date.day}/{start_date.month}/{start_date.year} {start_date.hour}:{start_date.minute}"
+    str_date_end = f"{end_date.day}/{end_date.month}/{end_date.year} {end_date.hour}:{end_date.minute}"
+    date_range = f"{str_date_begin} - {str_date_end}"
+
     if output == 'table':
-        print(f"Date range: {id_slot}")
-        print(tabulate(cars, headers={'station_name': 'Station Name', 'distance': 'Distance', 'car_name': 'Car', 'car_features': 'Features'}, tablefmt="psql", floatfmt=".1f"))
+        print(f"Date range: {date_range}")
+        header_mapping = {'station_name': 'Station Name', 'distance': 'Distance', 'car_name': 'Car',
+                          'car_features': 'Features'}
+        print(tabulate(cars, headers=header_mapping, tablefmt="psql", floatfmt=".1f"))
         print(f"Link: {book_url}")
     else:
-        print(json.dumps({'cars': cars, 'date_range': id_slot, 'link': book_url}))
+        print(json.dumps({'cars': cars, 'date_range': date_range, 'link': book_url}))
 
 
 @main.command()
@@ -109,18 +102,11 @@ def search(start_date, end_date, lang, username, password, city, output):
 def list_reservations(username, password, lang, status, output):
     """List existing reservations"""
 
-    status_name_to_status_id = {
-        'Ongoing': '0',
-        'Upcoming': '1',
-        'Past': '2',
-        'Cancelled': '3',
-        'All': '4'
-    }
     browser = authorize(username, password)
 
     reservations_url = 'https://www.reservauto.net/Scripts/client/ReservationList.asp' \
                        '?OrderBy=1' \
-                       '&ReservationStatus=' + status_name_to_status_id[status] + \
+                       '&ReservationStatus=' + utils.STATUS_NAME_TO_STATUS_ID[status] + \
                        '&CurrentLanguageID=' + ("2" if lang == 'en' else "1")
 
     browser.open(reservations_url)
@@ -132,56 +118,24 @@ def list_reservations(username, password, lang, status, output):
     for row in rows:
         cells = row.findChildren('td')
         reservation = {'id': cells[0].text.strip(),
-                       'car': get_car_by_id(browser, cells[2].find('a').attrs['href'].partition('CarID=')[2].partition('&')[0], ("2" if lang == 'en' else "1"))['car_name'],
+                       'car': utils.get_car_by_id(browser, cells[2].find('a').attrs['href'].partition('CarID=')[2].partition('&')[0], ("2" if lang == 'en' else "1"))['car_name'],
                        'from': cells[3].text.strip(),
                        'to': cells[4].text.strip(),
-                       'station': cells[9].text.strip()
-                       }
+                       'station': cells[9].text.strip()}
         reservations.append(reservation)
 
     if output == 'table':
-        print(tabulate(reservations, headers={'id': 'id', 'car': 'Car', 'from': 'From', 'to': 'To', 'station': 'Station'}, tablefmt="psql"))
+        header_mapping = {'id': 'id', 'car': 'Car', 'from': 'From', 'to': 'To', 'station': 'Station'}
+        print(tabulate(reservations, headers=header_mapping, tablefmt="psql"))
     else:
         print(json.dumps({'reservations': reservations}))
-
-
-def get_car_by_id(browser, car_id, lang_id):
-    """
-    Returns a car by given id
-    :param browser: authenticated browser
-    :param car_id: car id
-    :param lang_id: preferred language id
-    :return: dict with car name and car features
-    """
-
-    car_desc_url = 'https://www.reservauto.net/Scripts/client/CarDescription.asp' \
-                   '?CurrentLanguageID=' + lang_id + \
-                   '&CarID=' + car_id
-
-    browser.open(car_desc_url)
-    bs = BeautifulSoup(browser.response().read().decode("utf-8"), features="lxml")
-
-    desc = bs.find_all('font', {'face': 'Arial, Helvetica, sans-serif'})[0].text.strip().split(' - ')
-
-    return {'car_name': ' '.join(desc[0:3]), 'car_features': desc[3:]}
-
-
-def get_station_from_id(station_id):
-    """
-    :param station_id: the id of the station to look in the communauto list
-    :return: the station dict with all attributes
-    """
-    document = parse('ListStations.asp.xml')
-    station = document.find(f'Station[@StationID="{station_id}"]')
-    station.attrib['name'] = station.text
-    return station.attrib
 
 
 def authorize(username, password):
     cj = cookiejar.CookieJar()
     browser = mechanize.Browser()
     browser.set_cookiejar(cj)
-    browser.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0')]
+    browser.addheaders = [{'User-Agent', 'Mozilla/5.0'}]
     login_url = "https://www.communauto.com/en/my-account.html"
 
     # submit the first form to choose "communauto québec"
