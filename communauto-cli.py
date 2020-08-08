@@ -117,15 +117,22 @@ def list_reservations(username, password, lang, status, output):
     rows = table.findChildren(['tr'])[1:]
     for row in rows:
         cells = row.findChildren('td')
+        status = cells[5].text.strip()
+        if status.startswith('VRE'):
+            status = 'Early return'
+        price = cells[6].text.strip().replace('\t', ' ').replace('\r', ' ').replace('\n', ' ').replace('show price', '-').split()
         reservation = {'id': cells[0].text.strip(),
                        'car': utils.get_car_by_id(browser, cells[2].find('a').attrs['href'].partition('CarID=')[2].partition('&')[0], ("2" if lang == 'en' else "1"))['car_name'],
                        'from': cells[3].text.strip(),
                        'to': cells[4].text.strip(),
+                       'status': status,
+                       'rate': ' '.join(price[:-1]),
+                       'price': price[-1],
                        'station': cells[9].text.strip()}
         reservations.append(reservation)
 
     if output == 'table':
-        header_mapping = {'id': 'id', 'car': 'Car', 'from': 'From', 'to': 'To', 'station': 'Station'}
+        header_mapping = {'id': 'id', 'car': 'Car', 'from': 'From', 'to': 'To', 'status': 'Status', 'rate': 'Rate', 'price': 'Price', 'station': 'Station'}
         print(tabulate(reservations, headers=header_mapping, tablefmt="psql"))
     else:
         print(json.dumps({'reservations': reservations}))
