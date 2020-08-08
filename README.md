@@ -7,7 +7,7 @@ A CLI which simplifies interaction with Communauto website, currently supported 
 #### List reservations:
 
 ```bash
-./communauto-cli.py list-reservations --status=upcoming                                                                         
+./communauto-cli.py list-reservations --status=upcoming
 +----------+-----------------------+----------------------+----------------------+---------------------------+
 |       id | Car                   | From                 | To                   | Station                   |
 |----------+-----------------------+----------------------+----------------------+---------------------------|
@@ -20,7 +20,7 @@ A CLI which simplifies interaction with Communauto website, currently supported 
 The link at the bottom will redirect you to the page with available cars, so you'll just need to click on the preferred one to book it:
 
 ```bash
-./communauto-cli.py search --start_date="10/08/20 07:00" --end_date="10/08/20 16:00" --city=sherbrooke --lang=fr 
+./communauto-cli.py search --start_date="10/08/20 07:00" --end_date="10/08/20 16:00" --city=sherbrooke --lang=fr
 Date range: 10/8/2020 7:0 - 10/8/2020 16:0
 +-------------------------------+------------+----------------+-----------------------------------------------------------+
 | Station Name                  |   Distance | Car            | Features                                                  |
@@ -34,16 +34,10 @@ Link: https://www.reservauto.net/Scripts/client/ReservationDisponibility.asp?Ign
 
 ## How to use
 
-You should have python3 installed, then clone/download the repo and either:
+You should have python3 installed, then clone/download the repo and run:
 
 ```bash
-$ chmod +x ./communauto-cli.py
-$ ./communauto-cli.py --help
-``` 
-
-or 
-
-```bash
+$ pip3 install -r requirements.txt
 $ python3.8 ./communauto-cli.py --help
 ```
 
